@@ -1,19 +1,15 @@
 # 出海鉴 · 攻击面测绘（chuhaijian-surface-map）
 
-对**已授权** Web 目标做**非侵入、限流**测绘：常见路径可达性、响应头与技术栈线索。
+对**已授权**目标做非侵入测绘，并支持 **FOFA 挂图作战**：输入主域（可选组织名）→ 拉取公开索引资产 → 关系图谱 + HTML 作战图。
 
-> **不**做漏洞利用 · **不**爆破登录 · **不**修改业务数据  
-> 运行必须显式声明 `--i-am-authorized`
+> **不**做漏洞利用 · **不**爆破 · 必须 `--i-am-authorized`  
+> FOFA Key **只放环境变量**，不要写入 Git
 
 姊妹项目：[chuhaijian-codeaudit](https://github.com/tajleonbennis-maker/chuhaijian-codeaudit)
 
 ---
 
-## 现在可用（v0.1）
-
-对目标基址按白名单路径发送 **GET**（默认约 2 请求/秒），汇总状态码与部分响应头，输出 Markdown + JSON。
-
-### 安装
+## 安装
 
 ```bash
 git clone https://github.com/tajleonbennis-maker/chuhaijian-surface-map.git
@@ -21,35 +17,61 @@ cd chuhaijian-surface-map
 pip install -e .
 ```
 
-### 运行
+## 1）单 URL 只读探测
 
 ```bash
-# 仅对你拥有或书面授权的环境
 surfacemap run --url https://staging.example.com --out ./out --i-am-authorized
-
-# 更慢的限速 / 自定义路径文件
-surfacemap run --url https://staging.example.com --rps 1 --paths-file paths.txt --out ./out --i-am-authorized
 ```
 
-输出：
+## 2）FOFA 挂图作战（域名 → 资产宇宙）
 
-- `out/report.md`  
-- `out/surface.json`  
+```bash
+export FOFA_EMAIL="you@example.com"
+export FOFA_KEY="你的超级会员API_Key"
+# 可选: export FOFA_API_BASE=https://fofa.info
+
+surfacemap map \
+  --domain example.com \
+  --org "示例科技" \
+  --out ./ops-map \
+  --max-size 500 \
+  --i-am-authorized \
+  --authorization-ref "PROJ-2026-001"
+```
+
+组织名默认**不会**直接打 FOFA `title` 检索（噪声大）。若需要：
+
+```bash
+surfacemap map --domain example.com --org "示例科技" --include-org-query --i-am-authorized --out ./ops-map
+```
+
+### 输出
+
+| 文件 | 说明 |
+|------|------|
+| `ops-map/ops-map.html` | **作战挂图**（浏览器打开） |
+| `ops-map/assets.json` | 归一化资产 + 暴露启发式 |
+| `ops-map/graph.json` | nodes/edges |
+| `ops-map/map_bundle.json` | 完整结果包 |
+| `ops-map/report.md` | Markdown 摘要 |
 
 ---
 
-## 边界
+## 暴露标注说明
 
-| 会做 | 不会做 |
-|------|--------|
-| 限流 GET 常见路径 | 注入 / XSS / 越权利用 |
-| 记录状态码与公开头 | 写操作、爆破 |
-| 技术栈线索摘要 | 未授权扫描 |
+对 FOFA 结果做**本地启发式**（敏感端口、标题关键词等），用于挂图着色与优先级。  
+**不代表已验证漏洞，不能替代渗透测试。**
 
-详见 [SAFETY.md](SAFETY.md)、[docs/scope.md](docs/scope.md)。
+---
+
+## 安全与合规
+
+- 仅对书面授权的组织/域名使用  
+- FOFA 查询消耗账号配额，注意 `--max-size`  
+- 详见 [SAFETY.md](SAFETY.md)
 
 ---
 
 ## License
 
-AGPL-3.0-or-later（见 `pyproject.toml`）。
+AGPL-3.0-or-later
