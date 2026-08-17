@@ -30,9 +30,32 @@ DEFAULT_PATHS = [
     "/docs",
     "/graphql",
     "/actuator/health",
+    "/actuator",
+    "/wp-json",
+    "/_next/static",
 ]
 
-UA = "chuhaijian-surface-map/0.1 (+non-intrusive recon; authorized use only)"
+UA = "chuhaijian-surface-map/0.3 (+non-intrusive recon; authorized use only)"
+
+INTERESTING_HEADERS = (
+    "server",
+    "content-type",
+    "x-powered-by",
+    "x-generator",
+    "x-aspnet-version",
+    "x-aspnetmvc-version",
+    "x-drupal-cache",
+    "x-shopify-stage",
+    "x-vercel-id",
+    "x-nextjs-cache",
+    "strict-transport-security",
+    "content-security-policy",
+    "x-frame-options",
+    "location",
+    "via",
+    "cf-ray",
+    "x-cdn",
+)
 
 
 def _rate_sleep(last: float, rps: float) -> float:
@@ -62,20 +85,8 @@ def _fetch(url: str, method: str = "GET", timeout: float = 12.0) -> dict[str, An
                 "method": method,
                 "status": resp.status,
                 "elapsed_ms": elapsed_ms,
-                "headers": {
-                    k: headers[k]
-                    for k in (
-                        "server",
-                        "content-type",
-                        "x-powered-by",
-                        "strict-transport-security",
-                        "content-security-policy",
-                        "x-frame-options",
-                        "location",
-                    )
-                    if k in headers
-                },
-                "body_preview": body[:500].decode("utf-8", errors="replace"),
+                "headers": {k: headers[k] for k in INTERESTING_HEADERS if k in headers},
+                "body_preview": body[:800].decode("utf-8", errors="replace"),
                 "error": None,
             }
     except urllib.error.HTTPError as e:
@@ -86,15 +97,11 @@ def _fetch(url: str, method: str = "GET", timeout: float = 12.0) -> dict[str, An
             "method": method,
             "status": e.code,
             "elapsed_ms": elapsed_ms,
-            "headers": {
-                k: headers[k]
-                for k in ("server", "content-type", "location")
-                if k in headers
-            },
+            "headers": {k: headers[k] for k in INTERESTING_HEADERS if k in headers},
             "body_preview": "",
             "error": None,
         }
-    except Exception as e:  # noqa: BLE001 — 汇总为探测结果
+    except Exception as e:  # noqa: BLE001
         return {
             "url": url,
             "method": method,
@@ -126,8 +133,6 @@ def probe_target(
     last = 0.0
     for path in paths:
         last = _rate_sleep(last, rps)
-        url = urljoin(base, path.lstrip("/"))
-        # 保持 path 语义
         url = base.rstrip("/") + path
         hit = _fetch(url, method="GET")
         results.append(hit)
@@ -141,12 +146,13 @@ def probe_target(
     tech: set[str] = set()
     for r in results:
         h = r.get("headers") or {}
-        if h.get("server"):
-            tech.add(f"server:{h['server']}")
-        if h.get("x-powered-by"):
-            tech.add(f"x-powered-by:{h['x-powered-by']}")
-        if h.get("content-type"):
-            tech.add(f"ctype:{h['content-type'].split(';')[0].strip()}")
+        for key in ("server", "x-powered-by", "x-generator", "via", "x-cdn"):
+            if h.get(key):
+                tech.add(f"{key}:{h[key]}")
+        if h.get("x-nextjs-cache") is not None or h.get("x-vercel-id"):
+            tech.add("framework:nextjs-or-vercel")
+        if h.get("cf-ray"):
+            tech.add("cdn:cloudflare")
 
     return {
         "target": base_url,
