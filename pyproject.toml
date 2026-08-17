@@ -1,7 +1,7 @@
 [project]
 name = "chuhaijian-surface-map"
-version = "0.1.0"
-description = "出海鉴 · 授权目标非侵入攻击面测绘（无利用）"
+version = "0.2.0"
+description = "出海鉴 · 授权目标非侵入攻击面测绘 / FOFA 挂图作战（无利用）"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "AGPL-3.0-or-later" }
